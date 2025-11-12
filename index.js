@@ -1,11 +1,18 @@
 #!/usr/bin/env node
 /**
- * MCP Relay
+ * MCP SSE Bridge
  * 
  * A universal stdio-to-HTTP/SSE bridge for Model Context Protocol servers.
  * Allows Cursor CLI and other stdio-based MCP clients to communicate with
  * HTTP/SSE-based MCP servers that require session handling.
  */
+
+// Logging helpers - only log warnings/errors to stderr
+const log = {
+  info: () => {}, // Silent in production
+  warn: (msg) => console.error(`[Relay Warning] ${msg}`),
+  error: (msg) => console.error(`[Relay Error] ${msg}`)
+};
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -45,7 +52,7 @@ function parseHeaders(headersJson) {
   try {
     return JSON.parse(headersJson);
   } catch (error) {
-    console.error('[Relay] Warning: Failed to parse BRIDGE_HEADERS:', error.message);
+    log.warn(`Failed to parse BRIDGE_HEADERS: ${error.message}`);
     return undefined;
   }
 }
@@ -97,7 +104,7 @@ async function probeCapabilities(client) {
  */
 async function connectToUpstream() {
   try {
-    console.error(`[Relay] Connecting to upstream server at ${SSE_ENDPOINT}...`);
+    log.info(`Connecting to upstream server at ${SSE_ENDPOINT}...`);
     
     // Create EventSource with optional headers
     const eventSourceOptions = BRIDGE_HEADERS ? { headers: BRIDGE_HEADERS } : undefined;
@@ -122,11 +129,11 @@ async function connectToUpstream() {
     isConnected = true;
     reconnectAttempts = 0;
     
-    console.error('[Relay] Connected to upstream server successfully');
+    log.info('Connected to upstream server successfully');
     
     return upstreamClient;
   } catch (error) {
-    console.error('[Relay] Failed to connect to upstream server:', error.message);
+    log.error(`Failed to connect to upstream server: ${error.message}`);
     throw error;
   }
 }
@@ -141,9 +148,9 @@ async function createRelayServer() {
   }
   
   // Probe what the upstream server supports
-  console.error('[Relay] Probing upstream capabilities...');
+  log.info('Probing upstream capabilities...');
   const capabilities = await probeCapabilities(upstreamClient);
-  console.error('[Relay] Upstream capabilities:', Object.keys(capabilities).join(', ') || 'none');
+  log.info(`Upstream capabilities: ${Object.keys(capabilities).join(', ') || 'none'}`);
   
   // Create stdio server with mirrored capabilities
   const server = new Server({
@@ -162,7 +169,7 @@ async function createRelayServer() {
       try {
         return await upstreamClient.listTools();
       } catch (error) {
-        console.error('[Relay] Error listing tools:', error.message);
+        log.error(`Error listing tools: ${error.message}`);
         throw error;
       }
     });
@@ -174,7 +181,7 @@ async function createRelayServer() {
       try {
         return await upstreamClient.callTool(request.params);
       } catch (error) {
-        console.error('[Relay] Error calling tool:', error.message);
+        log.error(`Error calling tool: ${error.message}`);
         throw error;
       }
     });
@@ -189,7 +196,7 @@ async function createRelayServer() {
       try {
         return await upstreamClient.listResources();
       } catch (error) {
-        console.error('[Relay] Error listing resources:', error.message);
+        log.error(`Error listing resources: ${error.message}`);
         throw error;
       }
     });
@@ -201,7 +208,7 @@ async function createRelayServer() {
       try {
         return await upstreamClient.readResource(request.params);
       } catch (error) {
-        console.error('[Relay] Error reading resource:', error.message);
+        log.error(`Error reading resource: ${error.message}`);
         throw error;
       }
     });
@@ -216,7 +223,7 @@ async function createRelayServer() {
       try {
         return await upstreamClient.listPrompts();
       } catch (error) {
-        console.error('[Relay] Error listing prompts:', error.message);
+        log.error(`Error listing prompts: ${error.message}`);
         throw error;
       }
     });
@@ -228,7 +235,7 @@ async function createRelayServer() {
       try {
         return await upstreamClient.getPrompt(request.params);
       } catch (error) {
-        console.error('[Relay] Error getting prompt:', error.message);
+        log.error(`Error getting prompt: ${error.message}`);
         throw error;
       }
     });
@@ -236,18 +243,18 @@ async function createRelayServer() {
   
   // Handle upstream disconnection with exponential backoff
   upstreamClient.onclose = async () => {
-    console.error('[Relay] Upstream connection closed, attempting to reconnect...');
+    log.warn('Upstream connection closed, attempting to reconnect...');
     isConnected = false;
     
     const delay = getReconnectDelay();
-    console.error(`[Relay] Reconnecting in ${delay}ms (attempt ${reconnectAttempts})...`);
+    log.info(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts})...`);
     
     setTimeout(async () => {
       try {
         await connectToUpstream();
-        console.error('[Relay] Reconnected to upstream server');
+        log.info('Reconnected to upstream server');
       } catch (error) {
-        console.error('[Relay] Reconnection failed:', error.message);
+        log.error(`Reconnection failed: ${error.message}`);
         // Will retry on next connection attempt
       }
     }, delay);
@@ -261,8 +268,8 @@ async function createRelayServer() {
  */
 async function main() {
   try {
-    console.error('[Relay] Starting MCP Relay...');
-    console.error(`[Relay] Configuration:
+    log.info('Starting MCP SSE Bridge...');
+    log.info(`Configuration:
   - Upstream URL: ${BRIDGE_URL}
   - SSE Path: ${BRIDGE_SSE_PATH}
   - Full SSE Endpoint: ${SSE_ENDPOINT}
@@ -275,19 +282,17 @@ async function main() {
     const transport = new StdioServerTransport();
     await server.connect(transport);
     
-    console.error('[Relay] Relay server started successfully');
-    console.error('[Relay] Waiting for MCP requests from stdio client (e.g., Cursor CLI)...');
+    log.info('Bridge started successfully');
     
   } catch (error) {
-    console.error('[Relay] Fatal error:', error.message);
-    console.error(error.stack);
+    log.error(`Fatal error: ${error.message}`);
+    log.error(error.stack);
     process.exit(1);
   }
 }
 
 // Handle graceful shutdown
 process.on('SIGINT', () => {
-  console.error('[Relay] Shutting down...');
   if (upstreamClient) {
     upstreamClient.close();
   }
@@ -295,7 +300,6 @@ process.on('SIGINT', () => {
 });
 
 process.on('SIGTERM', () => {
-  console.error('[Relay] Shutting down...');
   if (upstreamClient) {
     upstreamClient.close();
   }
