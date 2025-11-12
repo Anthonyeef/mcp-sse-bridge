@@ -1,6 +1,6 @@
 {
   "name": "mcp-sse-bridge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Universal stdio-to-HTTP/SSE bridge for Model Context Protocol servers",
   "type": "module",
   "main": "index.js",
@@ -23,11 +23,11 @@
     "ai",
     "tools"
   ],
-  "author": "Yi Fen Wu",
+  "author": "Yifen Wu",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/mcp-sse-bridge.git"
+    "url": "https://github.com/Anthonyeef/mcp-sse-bridge.git"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
