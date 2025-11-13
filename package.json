@@ -1,11 +1,11 @@
 {
   "name": "mcp-sse-bridge",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Universal stdio-to-HTTP/SSE bridge for Model Context Protocol servers",
   "type": "module",
   "main": "index.js",
   "bin": {
-    "mcp-sse-bridge": "./index.js"
+    "mcp-sse-bridge": "index.js"
   },
   "scripts": {
     "start": "node index.js",
@@ -27,7 +27,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Anthonyeef/mcp-sse-bridge.git"
+    "url": "git+https://github.com/Anthonyeef/mcp-sse-bridge.git"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
